@@ -1,0 +1,7 @@
+# Direct dependencies, exact-pinned (tested together 2026-08-31).
+# Full transitive lock for reproducibility: requirements-lock.txt
+flask==3.1.3
+pandas==3.0.5
+numpy==2.4.6
+gunicorn==26.2.0
+google-genai==2.20.0  # optional Gemini phrasing layer for the chatbot (activated only when GEMINI_PROJECT or GOOGLE_CLOUD_PROJECT is set)

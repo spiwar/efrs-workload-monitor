@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.pyc
+
+# Local runtime artifacts
+app/logs/
+app/_srv2.*
+~$*
+
+# Full source dataset (~315 MB) exceeds GitHub's 100 MB limit; the app runs from
+# the committed cleaned cache (app/.cache_v5.pkl) or an EFRS_CSV override.
+Dataset/*.csv
+
+# Stale dev caches - the server reads only .cache_v5.pkl (keep that one committed)
+app/.cache_clean.pkl
+app/.cache_v2.pkl
+app/.cache_v3.pkl
+
+# Local agent-tool state (never commit)
+.claude/settings.local.json
+
+# Virtual environments
+.venv*/
+venv/

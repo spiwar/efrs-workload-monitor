@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EFRS — Incident Duration & Workload Monitor</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  :root{--ink:#1a1d21;--muted:#5c6470;--line:#e6e9ee;--bg:#fff;--soft:#f6f8fa;
+    --accent:#b21f24;--base:#9aa4b2;--band:rgba(178,31,36,.12);--ok:#1f7a3d;--warn:#b06a00;--up:#b21f24;--down:#1f7a3d;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  .layout{display:flex;min-height:100vh}
+  aside{width:225px;flex:0 0 225px;border-right:1px solid var(--line);background:var(--soft);padding:22px 16px;position:sticky;top:0;height:100vh;display:flex;flex-direction:column}
+  .brand .kick{font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--accent);font-weight:700}
+  .brand h1{font-size:17px;margin:6px 0 4px;line-height:1.3}
+  .brand .sub{color:var(--muted);font-size:11.5px;line-height:1.45}
+  nav{margin-top:22px;display:flex;flex-direction:column;gap:4px}
+  .nav{font-size:14px;text-align:left;padding:10px 12px;border:none;background:none;color:var(--muted);cursor:pointer;border-radius:8px;border-left:3px solid transparent}
+  .nav.active{color:var(--accent);background:#fff;border-left-color:var(--accent);font-weight:600}
+  .aside-foot{margin-top:auto;font-size:10.5px;color:var(--muted);line-height:1.5;border-top:1px solid var(--line);padding-top:12px}
+  main{flex:1;min-width:0;padding:20px 26px 70px;max-width:1220px}
+  .topbar{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;border-bottom:3px solid var(--accent);padding-bottom:14px;position:sticky;top:0;z-index:1000;box-shadow:0 6px 12px -8px rgba(124,45,18,.25)}
+  .ctrl label{display:block;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:4px}
+  .hourctrl{min-width:186px}
+  .hourctrl label{text-transform:none;letter-spacing:0;font-size:10.5px}
+  #hourlabel{font-size:12px;font-weight:600;color:var(--ink);text-transform:none;letter-spacing:0}
+  .rangewrap{position:relative;height:32px;display:flex;align-items:center;padding:0 8px}
+  .rangetrack{position:absolute;left:8px;right:8px;height:4px;background:#e7d6c2;border-radius:3px}
+  .rangefill{position:absolute;height:4px;background:var(--accent);border-radius:3px}
+  .rangewrap input[type=range]{position:absolute;left:8px;right:8px;width:calc(100% - 16px);margin:0;background:none;pointer-events:none;-webkit-appearance:none;appearance:none;height:32px}
+  .rangewrap input[type=range]::-webkit-slider-runnable-track{background:none;border:none}
+  .rangewrap input[type=range]::-moz-range-track{background:none;border:none}
+  .rangewrap input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;height:16px;width:16px;margin-top:-6px;border-radius:50%;background:#fff;border:2px solid var(--accent);cursor:pointer;pointer-events:auto;box-shadow:0 1px 3px rgba(0,0,0,.28)}
+  .rangewrap input[type=range]::-moz-range-thumb{height:14px;width:14px;border-radius:50%;background:#fff;border:2px solid var(--accent);cursor:pointer;pointer-events:auto;box-shadow:0 1px 3px rgba(0,0,0,.28)}
+  select,input[type=date]{font-size:13px;padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink)}
+  .clockwrap{margin-left:auto;display:flex;gap:8px;align-items:flex-end}
+  .clock{font-size:12px;color:var(--muted);background:var(--soft);border:1px solid var(--line);border-radius:8px;padding:8px 12px}
+  .clock b{color:var(--ink)}
+  #refreshBtn{font-size:12.5px;padding:8px 14px;border:none;border-radius:8px;background:var(--accent);color:#fff;cursor:pointer}
+  #refreshBtn:disabled{background:var(--base);cursor:wait}
+  .notes{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 6px}
+  .chip{font-size:12px;background:var(--soft);border:1px solid var(--line);border-radius:20px;padding:4px 12px;color:var(--muted)}
+  .chip b{color:var(--ink)}.chip.warn{background:#fff6e9;border-color:#f0dcb8;color:var(--warn)}
+  .panel{display:none}.panel.active{display:block}
+  .headline{background:var(--soft);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:0 10px 10px 0;padding:14px 18px;margin:14px 0 6px;font-size:15px;line-height:1.5}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:13px;margin:18px 0}
+  .kpi{border:1px solid var(--line);border-radius:11px;padding:14px 15px;background:#fff}
+  .kpi .k{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+  .kpi .v{font-size:24px;font-weight:700;margin:4px 0 2px}.kpi .d{font-size:12px;color:var(--muted)}
+  .delta.up{color:var(--up);font-weight:600}.delta.down{color:var(--down);font-weight:600}.delta.flat{color:var(--muted)}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .card{border:1px solid var(--line);border-radius:12px;padding:16px 18px;background:#fff;margin-bottom:16px}
+  .card h3{font-size:15px;margin:0 0 2px}.card .cap{font-size:12px;color:var(--muted);margin-bottom:10px}
+  .chartbox{position:relative;height:240px}
+  .insight{font-size:13px;color:#33373d;background:var(--soft);border-radius:8px;padding:9px 12px;margin-top:10px;line-height:1.45}
+  .mapbox{height:460px;border-radius:10px;overflow:hidden;border:1px solid var(--line)}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12.5px;color:var(--muted);margin-top:10px}
+  .legend i{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:5px;vertical-align:-1px}
+  .hm{display:grid;grid-template-columns:36px repeat(24,1fr);gap:2px;margin-top:4px}
+  .hm .lab{font-size:10px;color:var(--muted);align-self:center}
+  .hm .hlab{font-size:9px;color:var(--muted);text-align:center}
+  .hm .cell{height:17px;border-radius:2px;background:var(--soft)}
+  table.movers{width:100%;border-collapse:collapse;font-size:13px}
+  table.movers th{font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);text-align:left;padding:6px 8px;border-bottom:1px solid var(--line)}
+  table.movers td{padding:7px 8px;border-bottom:1px solid var(--line)}
+  table.movers td.pct{font-weight:600}
+  .chatbox{border:1px solid var(--line);border-radius:12px;background:#fff;overflow:hidden}
+  .chatlog{padding:16px;min-height:240px;max-height:440px;overflow-y:auto}
+  .msg{margin-bottom:12px;font-size:14px;line-height:1.55}
+  .msg .who{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:3px}
+  .msg.user .bubble{background:var(--soft);border-radius:10px;padding:9px 13px;display:inline-block}
+  .msg.bot .bubble{background:#fff;border:1px solid var(--line);border-radius:10px;padding:11px 14px;white-space:pre-line}
+  .msg.bot.refused .bubble{border-color:#f0dcb8;background:#fff6e9}
+  .chatin{display:flex;gap:8px;border-top:1px solid var(--line);padding:12px}
+  .chatin input{flex:1;font-size:14px;padding:10px 12px;border:1px solid var(--line);border-radius:8px}
+  .chatin button{font-size:13px;padding:10px 16px;border:none;border-radius:8px;background:var(--accent);color:#fff;cursor:pointer}
+  .egrow{display:flex;flex-wrap:wrap;gap:7px;margin:10px 0}
+  .ask-eg{background:var(--soft);color:var(--muted);border:1px solid var(--line);padding:6px 11px;font-size:12.5px;border-radius:8px;cursor:pointer}
+  .guide h2{font-size:19px;margin:20px 0 8px}
+  .guide p,.guide li{font-size:14px;line-height:1.65;color:#2a2d31}
+  .guide ul{padding-left:22px;margin:6px 0}
+  .guide .must{border-left:4px solid var(--accent);background:var(--soft);padding:12px 16px;border-radius:0 8px 8px 0;margin:12px 0}
+  .gov{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:13px;margin:14px 0}
+  footer{margin-top:28px;border-top:1px solid var(--line);padding-top:14px;color:var(--muted);font-size:12px;line-height:1.5}
+  @media(max-width:960px){.layout{flex-direction:column}aside{width:auto;height:auto;position:static;flex-direction:row;align-items:center;gap:14px}
+    nav{flex-direction:row;margin-top:0}.aside-foot{display:none}.grid{grid-template-columns:1fr}.clockwrap{margin-left:0}}
+
+  /* ---- v2 fire theme ---- */
+  body{background:#faf6f1}
+  aside{background:linear-gradient(180deg,#430c0c,#7f1d1d);border-right:none}
+  .brand .kick{color:#ffb74d}
+  .brand h1{color:#fff}
+  .brand .sub{color:#f3cfae}
+  .nav{color:#f0d5bd}
+  .nav.active{color:#ffcc80;background:rgba(255,255,255,.10);border-left-color:#ffb74d}
+  .aside-foot{color:#dcb08e;border-top-color:rgba(255,255,255,.18)}
+  .aside-foot a{color:#ffcc80}
+  .topbar{background:linear-gradient(135deg,#fff6ec,#fff);border:1px solid #f0dcc8;border-bottom:3px solid var(--accent);border-radius:12px;padding:14px 16px}
+  .card{border:1px solid #eddcc9;box-shadow:0 1px 4px rgba(124,45,18,.07);background:#fffdfb}
+  .card h3{border-bottom:2px solid #f7e3cb;padding-bottom:7px}
+  .kpi{background:linear-gradient(180deg,#fffaf3,#fff);border:1px solid #eddcc9;border-left:3px solid #f59e0b}
+  .headline{background:#fff4e4;border-color:#f2ddc0}
+  .insight{background:#faf1e6}
+  .chip{background:#fdf3e7;border-color:#f0dcc8}
+  .guide .must{background:#fff4e4;border-left-color:#f59e0b}
+  select,input[type=date]{border-color:#e4cdb4}
+  .clock{background:#fdf3e7;border-color:#f0dcc8}
+  footer{border-top-color:#eddcc9}
+</style>
+</head>
+<body>
+<div class="layout">
+  <aside>
+    <div class="brand">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+        <svg width="44" height="44" viewBox="0 0 48 48" aria-label="City of Edmonton badge"><circle cx="24" cy="24" r="23" fill="#fff" stroke="#ffb74d" stroke-width="2"/><path d="M24 8c2 6-6 9-5 16 .6 4 3 6 3 6s-1-6 3-9c0 4 6 5 6 12 0 5-3.4 8-7 8s-8-2.6-8-9c0-9 7-11 8-24z" fill="#c62828"/><path d="M24 26c1 2.8-2 4-1.4 7 .4 2 2.4 3 3.4 3 1.6 0 3-1.4 3-3.8 0-3.7-3.6-4.2-5-6.2z" fill="#f59e0b"/></svg>
+        <div style="font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:#f3cfae;line-height:1.5">City of Edmonton<br><b style="color:#ffcc80">Open Data</b></div>
+      </div>
+      <div class="kick">Edmonton Fire Rescue · Operations</div>
+      <h1>Incident Duration &amp; Workload Monitor</h1>
+      <div class="sub">Event handling time (dispatch&rarr;close) &amp; volume vs the 5-year norm</div>
+    </div>
+    <nav>
+      <button class="nav active" data-tab="guide">① How to use</button>
+      <button class="nav" data-tab="overview">② Overview</button>
+      <button class="nav" data-tab="forecast">③ Forecast</button>
+      <button class="nav" data-tab="ask">④ Ask the data</button>
+    </nav>
+    <div class="aside-foot">Source: City of Edmonton Open Data<br>Fire Response (7hsn-idqi), updated daily.<br>Handling time is dispatch&rarr;close — never a response time.</div>
+  </aside>
+  <main>
+    <div class="topbar">
+      <div class="ctrl"><label for="year">Period</label><select id="year"></select></div>
+      <div class="ctrl"><label for="from">From date</label><input type="date" id="from"></div>
+      <div class="ctrl"><label for="to">To date</label><input type="date" id="to"></div>
+      <div class="ctrl hourctrl"><label>Hour band <span id="hourlabel">00:00 – 23:00</span></label>
+        <div class="rangewrap">
+          <div class="rangetrack"><div class="rangefill" id="hourfill"></div></div>
+          <input type="range" id="h1" min="0" max="23" step="1" value="0" aria-label="From hour">
+          <input type="range" id="h2" min="0" max="23" step="1" value="23" aria-label="To hour">
+        </div>
+      </div>
+      <div class="ctrl"><label for="event">Event type</label><select id="event"></select></div>
+      <div class="ctrl"><label for="unknown">UNKNOWN nbhd</label>
+        <select id="unknown"><option value="exclude">Exclude (default)</option><option value="include">Include</option></select></div>
+      <div class="clockwrap">
+        <div class="clock">Data current to <b id="clock">…</b></div>
+        <button id="refreshBtn" title="Pull the newest daily data from Edmonton Open Data">⟳ Refresh data</button>
+      </div>
+    </div>
+    <div class="notes" id="notes"></div>
+
+    <div class="panel active guide" id="panel-guide">
+      <div class="headline">This monitor shows an EFRS operations / performance lead <b>how long events tie up
+        crews and apparatus</b> and <b>where and when that workload concentrates</b> — always against a
+        multi-year norm, so drift is visible. It informs; the lead decides.</div>
+      <h2>The one rule that matters</h2>
+      <p>Every duration in this app is <b>event handling time — dispatch&rarr;close</b>: the time an event file
+        was open, from first dispatch to the last unit clearing. The dataset has <b>no arrival and no
+        call-received timestamp</b>, so this app never shows a response time, time-to-arrival, or NFPA
+        benchmark — asking for one is declined and logged, by design.</p>
+      <h2>How to use each page</h2>
+      <ul>
+        <li><b>② Overview</b> — the current window at a glance: KPI cards, handling-time distribution,
+          volume by hour / weekday, a weekday&times;hour heatmap, top neighbourhoods, units dispatched,
+          a "biggest shifts" table, and a choropleth map of areas running above their own norm.
+          Hover any chart for exact values; click a map area for its numbers; use the map's
+          Hotspots/All toggle.</li>
+        <li><b>③ Forecast</b> — a transparent seasonal projection of <i>volume only</i> for the next 6
+          months with an ~80% interval, plus projected event-hours. It is an extrapolation with
+          uncertainty, never a causal claim. Date/hour filters do not apply here (it uses full
+          monthly history).</li>
+        <li><b>④ Ask the data</b> — plain-language questions ("when is medical busiest downtown?",
+          "how should I plan crews for downtown fire?"). Decision-support answers describe demand
+          patterns; unsupported asks (response times, station performance) are refused and logged.</li>
+      </ul>
+      <h2>Filters (top bar, apply everywhere except Forecast)</h2>
+      <ul>
+        <li><b>Period + From/To date</b> — pick a year and an exact date range inside it. The 5-year
+          baseline automatically uses the <i>same date range</i> in the 5 prior years, so every
+          comparison stays like-for-like. The latest year is capped at the data cutoff.</li>
+        <li><b>From/To hour</b> — restrict to a time-of-day band (e.g. 15:00–18:59); the baseline
+          follows the same band.</li>
+        <li><b>Event type / UNKNOWN</b> — filter to one event type; include or exclude events whose
+          neighbourhood is recorded as the literal value UNKNOWN (~13% of rows).</li>
+        <li><b>⟳ Refresh data</b> — pulls the newest rows from Edmonton Open Data (the city updates
+          the dataset daily, so "live" here means <i>daily-fresh, not real-time</i>). The clock shows
+          the newest event in the data.</li>
+      </ul>
+      <h2>Data source</h2>
+      <p>City of Edmonton Open Data — <i>Fire Response (Current and Historical)</i>, dataset
+        <b>7hsn-idqi</b>, 2011&rarr;present, one row per dispatch event. Non-incident administrative
+        records (training/maintenance, community events, pre-incident planning, permit burning) are
+        excluded from every metric. Timestamps are parsed with fixed rules; negative/zero durations
+        are dropped.</p>
+      <h2>Limitations — read before acting</h2>
+      <div class="must">
+        <ul>
+          <li><b>No response times.</b> Handling time (dispatch&rarr;close) cannot say how fast crews arrived.</li>
+          <li><b>The latest year is partial.</b> It is only ever compared year-to-date vs the same window in prior years.</li>
+          <li><b>Locations are approximate.</b> Events are geocoded to the nearest intersection; the app never goes below neighbourhood level.</li>
+          <li><b>Counts are dispatches, not workload-hours.</b> Units dispatched are unit <i>types</i>, not identified apparatus or crews; there is no station field.</li>
+          <li><b>Monitoring, not inference.</b> No causal or predictive claims; the forecast is a labelled volume extrapolation.</li>
+        </ul>
+      </div>
+      <h2>Governance</h2>
+      <div class="gov">
+        <div class="kpi"><div class="k">Valid incidents (data)</div><div class="v" id="gov-n">…</div><div class="d">of <span id="gov-raw">…</span> raw records after fixed cleaning</div></div>
+        <div class="kpi"><div class="k">Unsupported asks refused</div><div class="v" id="gov-ref">…</div><div class="d">logged to the refusal log, by design</div></div>
+        <div class="kpi"><div class="k">UNKNOWN neighbourhood</div><div class="v" id="gov-unk">…</div><div class="d">a literal value, not missing; policy is switchable</div></div>
+        <div class="kpi"><div class="k">Live refreshes run</div><div class="v" id="gov-refresh">…</div><div class="d">each one logged with what it added</div></div>
+      </div>
+      <p style="color:var(--muted);font-size:13px">The performance lead has the final word on any action.
+        The app informs — it does not decide. Overrides of defaults (baseline, UNKNOWN policy,
+        re-included types) are logged so the defaults can be audited.</p>
+    </div>
+
+    <div class="panel" id="panel-overview">
+      <div class="kpis" id="kpis"></div>
+      <div class="grid">
+        <div class="card"><h3>Handling-time distribution</h3><div class="cap">Minutes from dispatch to close, this window</div><div class="chartbox"><canvas id="distChart"></canvas></div><div class="insight" id="ins-dist"></div></div>
+        <div class="card"><h3>Volume by hour of day</h3><div class="cap">Bars = this window · line = 5-year average, same window</div><div class="chartbox"><canvas id="hourChart"></canvas></div><div class="insight" id="ins-hour"></div></div>
+        <div class="card"><h3>Volume by weekday</h3><div class="cap">Bars = this window · line = 5-year average, same window</div><div class="chartbox"><canvas id="weekdayChart"></canvas></div><div class="insight" id="ins-weekday"></div></div>
+        <div class="card"><h3>Top neighbourhoods by volume</h3><div class="cap">This window · tooltip shows median handling time</div><div class="chartbox"><canvas id="nbhdChart"></canvas></div><div class="insight" id="ins-nbhd"></div></div>
+        <div class="card" style="grid-column:1 / -1"><h3>When workload concentrates — weekday &times; hour</h3><div class="cap">Each cell is one weekday-hour combination in this window; green = quiet &rarr; yellow &rarr; red = busy. Hover a cell for the exact count.</div><div class="hm" id="heatmap"></div><div class="insight" id="ins-heat"></div></div>
+        <div class="card"><h3>Units dispatched by type</h3><div class="cap">Red = this window · grey = 5-yr average, same window. Unit TYPES listed on dispatch — not identified apparatus, crews, or crew-hours.</div><div class="chartbox"><canvas id="equipChart"></canvas></div><div class="insight" id="ins-equip"></div></div>
+        <div class="card"><h3>Biggest shifts vs norm</h3><div class="cap" id="cap-movers">Cells most divergent from their own 5-yr norm (n &ge; 15, expected &ge; 8/yr, &ge; 25% shift).</div><div id="movers"></div><div class="insight" id="ins-movers"></div></div>
+        <div class="card" id="typeCard" style="grid-column:1 / -1"><h3>Median handling time by event type</h3><div class="cap">This window · only shown for "All incident types"</div><div class="chartbox" style="height:260px"><canvas id="typeChart"></canvas></div><div class="insight" id="ins-type"></div></div>
+        <div class="card" style="grid-column:1 / -1"><h3>Early-warning — areas running above the norm</h3>
+          <div class="cap" id="map-cap">Neighbourhoods &ge;25% above their 5-year norm for this window.</div>
+          <div class="egrow"><button class="ask-eg" id="mode-hot">Hotspots only</button><button class="ask-eg" id="mode-all">All neighbourhoods</button></div>
+          <div class="mapbox" id="map"></div>
+          <div class="legend" id="map-legend"></div>
+          <div class="insight" id="ins-map"></div></div>
+      </div>
+    </div>
+
+    <div class="panel" id="panel-forecast">
+      <div class="kpis" id="fkpis"></div>
+      <div class="card"><h3>Monthly volume — actual &amp; forecast</h3><div class="cap">Solid = recorded events · dashed = forecast · shaded = ~80% prediction interval. Volume only — not response time. Date/hour filters do not apply to the forecast.</div><div class="chartbox" style="height:300px"><canvas id="fcChart"></canvas></div><div class="insight" id="ins-fc"></div>
+      </div>
+    </div>
+
+    <div class="panel" id="panel-ask">
+      <div class="card" style="background:var(--soft)"><h3>Ask the data</h3>
+        <div class="cap">Decision-support questions — where/when demand concentrates, workload, forecast. Unsupported asks (response/arrival time, station performance) are declined and logged, by design.</div>
+        <div class="egrow" id="egrow"></div></div>
+      <div class="chatbox"><div class="chatlog" id="chatlog"></div>
+        <div class="chatin"><input id="chatq" placeholder="e.g. how should I plan crews for downtown fire?" /><button id="chatsend">Ask</button></div></div>
+    </div>
+
+    <footer id="footer"></footer>
+  </main>
+</div>
+<script>
+const C={accent:'#b21f24',base:'#9aa4b2',band:'rgba(178,31,36,.12)',grid:'#eceef2'};
+let charts={},META=null,map=null,mapLayer=null,mapMode='hot',NBHD_GEO=null;
+const $=id=>document.getElementById(id);
+async function getJSON(u){return (await fetch(u)).json();}
+async function postJSON(u,b){return (await fetch(u,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)})).json();}
+function fmt(n){return n==null?'–':Number(n).toLocaleString();}
+function deltaTag(v,u){if(v==null)return '<span class="delta flat">—</span>';
+  const cls=Math.abs(v)<0.05?'flat':(v>0?'up':'down');const a=v>0?'▲':(v<0?'▼':'■');const s=v>0?'+':'';
+  return '<span class="delta '+cls+'">'+a+' '+s+v+u+'</span>';}
+function setText(id,t){$(id).textContent=t||'';}
+function destroy(k){if(charts[k])charts[k].destroy();}
+const GYR=[[27,94,32],[129,199,132],[255,224,130],[249,168,37],[229,57,53],[142,19,19]];
+function shade(t){t=Math.min(1,Math.max(0,t));const n=GYR.length-1;const i=Math.min(n-1,Math.floor(t*n));const f=t*n-i;const a=GYR[i],b=GYR[i+1];return 'rgb('+a.map((x,k)=>Math.round(x+(b[k]-x)*f)).join(',')+')';}
+function pad(n){return String(n).padStart(2,'0');}
+
+document.querySelectorAll('.nav').forEach(t=>t.addEventListener('click',()=>{
+  document.querySelectorAll('.nav').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));
+  t.classList.add('active');$('panel-'+t.dataset.tab).classList.add('active');
+  if(t.dataset.tab==='forecast')loadForecast();
+  if(t.dataset.tab==='overview'&&map)setTimeout(()=>map.invalidateSize(),80);
+}));
+
+function dateDefaults(){
+  const y=+$('year').value,[cm,cd]=META.cutoff,latest=y===META.latest;
+  $('from').value=y+'-01-01';$('from').min=y+'-01-01';
+  $('to').value=latest?(y+'-'+pad(cm)+'-'+pad(cd)):(y+'-12-31');
+  $('from').max=$('to').max=latest?(y+'-'+pad(cm)+'-'+pad(cd)):(y+'-12-31');
+  $('to').min=y+'-01-01';
+}
+function mmdd(id){const v=$(id).value;return v&&v.length===10?(v.slice(5,7)+'-'+v.slice(8,10)):'';}
+function fillMeta(){
+  const ys=$('year');ys.innerHTML='';META.years.forEach(y=>{const o=document.createElement('option');o.value=y;o.textContent=(y===META.latest)?(y+' (partial)'):y;ys.appendChild(o);});
+  const es=$('event');const keep=es.value;es.innerHTML='';META.event_types.forEach(e=>{const o=document.createElement('option');o.value=e.id;o.textContent=e.label;es.appendChild(o);});
+  if(keep)es.value=keep;
+  $('clock').textContent=META.data_current_to;
+  setText('gov-n',fmt(META.n_total));setText('gov-raw',fmt(META.n_raw));
+  setText('gov-ref',fmt(META.refusal_count));setText('gov-unk',META.unknown_pct+'%');
+  setText('gov-refresh',fmt(META.refresh_count));
+}
+async function init(){
+  META=await getJSON('/api/meta');
+  fillMeta();
+  // dual-thumb hour-band slider: two overlapping range inputs, thumbs can't cross.
+  // 'input' updates the label+fill live (no reload); 'change' (release) reloads via the
+  // shared listener below. params() still reads $('h1').value / $('h2').value.
+  ['h1','h2'].forEach(id=>$(id).addEventListener('input',()=>{
+    let a=+$('h1').value, b=+$('h2').value;
+    if(id==='h1'&&a>b) $('h1').value=b;
+    if(id==='h2'&&b<a) $('h2').value=a;
+    updateHourUI();
+  }));
+  updateHourUI();
+  dateDefaults();
+  $('year').addEventListener('change',()=>{dateDefaults();load();ifForecast();});
+  ['from','to','h1','h2','event','unknown'].forEach(id=>$(id).addEventListener('change',()=>{load();ifForecast();}));
+  $('refreshBtn').addEventListener('click',refreshData);
+  $('chatsend').addEventListener('click',sendChat);
+  $('chatq').addEventListener('keydown',e=>{if(e.key==='Enter')sendChat();});
+  $('mode-hot').addEventListener('click',()=>{mapMode='hot';loadMap();});
+  $('mode-all').addEventListener('click',()=>{mapMode='all';loadMap();});
+  ["How should I plan crews for downtown fire?","When is medical busiest downtown?","Forecast motor vehicle incidents for the next 6 months","What was the average response time?"].forEach(q=>{const b=document.createElement('button');b.className='ask-eg';b.textContent=q;b.onclick=()=>{$('chatq').value=q;sendChat();};$('egrow').appendChild(b);});
+  load();
+}
+function ifForecast(){if($('panel-forecast').classList.contains('active'))loadForecast();}
+function updateHourUI(){
+  const a=+$('h1').value, b=+$('h2').value;
+  $('hourlabel').textContent=pad(a)+':00 – '+pad(b)+':00';
+  const l=a/23*100, r=b/23*100, f=$('hourfill');
+  f.style.left=l+'%'; f.style.width=(r-l)+'%';
+}
+function params(){
+  return 'year='+$('year').value+'&event='+encodeURIComponent($('event').value)+'&unknown='+$('unknown').value+
+         '&from='+mmdd('from')+'&to='+mmdd('to')+'&h1='+$('h1').value+'&h2='+$('h2').value;
+}
+async function refreshData(){
+  const b=$('refreshBtn');b.disabled=true;b.textContent='Refreshing…';
+  try{
+    const r=await postJSON('/api/refresh',{});
+    if(r.ok){META=await getJSON('/api/meta');fillMeta();dateDefaults();
+      b.textContent=r.added?('✓ +'+r.added+' new'):'✓ Up to date';await load();ifForecast();}
+    else b.textContent='✗ '+(r.error||'failed');
+  }catch(e){b.textContent='✗ offline';}
+  setTimeout(()=>{b.textContent='⟳ Refresh data';b.disabled=false;},3500);
+}
+async function load(){const d=await getJSON('/api/metrics?'+params());render(d);loadMap();}
+function render(d){
+  const chips=['<span class="chip"><b>Window:</b> '+d.window_label+' ('+d.window.days+' days)</span>',
+    '<span class="chip"><b>Baseline:</b> '+(d.baseline_years.length?d.baseline_years[0]+'–'+d.baseline_years[d.baseline_years.length-1]+', same window':'n/a')+'</span>',
+    '<span class="chip"><b>UNKNOWN nbhd:</b> '+d.unknown_pct+'% ('+(d.unknown_policy==='include'?'included':'excluded from geo')+')</span>'];
+  if(d.partial)chips.unshift('<span class="chip warn">⚠ '+d.year+' is partial — data ends '+META.data_current_to+'; never shown as a full year</span>');
+  $('notes').innerHTML=chips.join('');
+  const s=d.selected,b=d.baseline;
+  $('kpis').innerHTML=
+    '<div class="kpi"><div class="k">Median handling time</div><div class="v">'+(s.median==null?'–':s.median+' min')+'</div><div class="d">'+deltaTag(d.median_delta,' min')+' vs 5-yr median '+(b.median==null?'–':b.median+' min')+'</div></div>'+
+    '<div class="kpi"><div class="k">p90 handling time</div><div class="v">'+(s.p90==null?'–':s.p90+' min')+'</div><div class="d">90% of events close within this</div></div>'+
+    '<div class="kpi"><div class="k">Event volume (N)</div><div class="v">'+fmt(s.n)+'</div><div class="d">'+deltaTag(d.vol_pct,'%')+' vs norm (~'+fmt(d.baseline_vol_mean)+'/yr)</div></div>'+
+    '<div class="kpi"><div class="k">Committed event-hours</div><div class="v">'+fmt(d.event_hours)+' h</div><div class="d">'+deltaTag(d.event_hours_pct,'%')+' vs norm (~'+fmt(d.event_hours_base)+' h/yr) · dispatch→close time, not crew-hours</div></div>'+
+    '<div class="kpi"><div class="k">Baseline N (5-yr pooled)</div><div class="v">'+fmt(b.n)+'</div><div class="d">'+d.baseline_years.length+' prior years, same window</div></div>';
+  setText('ins-dist',d.insights.dist);setText('ins-hour',d.insights.hour);setText('ins-weekday',d.insights.weekday);setText('ins-nbhd',d.insights.nbhd);setText('ins-type',d.insights.what_changed);
+  setText('ins-heat',(d.insights.heat||'').replace('Darker = more events','Green = quiet, red = busy'));setText('ins-equip',d.insights.equipment);setText('ins-movers',d.insights.movers);
+  drawDist(d);drawHour(d);drawWeekday(d);drawNbhd(d);drawType(d);drawHeat(d);drawEquip(d);drawMovers(d);
+  $('footer').innerHTML='Source: City of Edmonton Open Data — Fire Response (7hsn-idqi). Data current to '+META.data_current_to+'. '+fmt(META.n_total)+' valid incidents in the default YTD window after fixed cleaning. Duration is total event handling time (dispatch→close); the dataset has no arrival or call-received timestamp, so it cannot measure response time. Locations are geocoded to the nearest intersection; neighbourhood granularity only. '+META.exclusion_note;
+}
+const baseOpts=(e)=>Object.assign({responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{color:'#5c6470',font:{size:11}}},y:{grid:{color:C.grid},ticks:{color:'#5c6470',font:{size:11}},beginAtZero:true}}},e||{});
+const legend2=(a,b)=>({plugins:{legend:{display:true,labels:{boxWidth:12,font:{size:11},color:'#5c6470',generateLabels:()=>[{text:a,fillStyle:C.accent},{text:b,fillStyle:C.base}]}}}});
+function drawDist(d){destroy('dist');charts.dist=new Chart($('distChart'),{type:'bar',data:{labels:d.dist.map(x=>x.bin),datasets:[{type:'bar',data:d.dist.map(x=>x.count),backgroundColor:C.accent,borderRadius:3,order:2},{type:'line',data:d.dist.map(x=>x.baseline),borderColor:C.base,borderWidth:2,pointRadius:0,tension:.35,order:1}]},options:baseOpts(legend2('This window','5-yr avg'))});}
+function drawHour(d){destroy('hour');charts.hour=new Chart($('hourChart'),{type:'bar',data:{labels:d.by_hour.map(x=>pad(x.hour)),datasets:[{type:'bar',data:d.by_hour.map(x=>x.current),backgroundColor:C.accent,borderRadius:2,order:2},{type:'line',data:d.by_hour.map(x=>x.baseline),borderColor:C.base,borderWidth:2,pointRadius:0,tension:.35,order:1}]},options:baseOpts(legend2('This window','5-yr avg'))});}
+function drawWeekday(d){destroy('weekday');charts.weekday=new Chart($('weekdayChart'),{type:'bar',data:{labels:d.by_weekday.map(x=>x.weekday),datasets:[{type:'bar',data:d.by_weekday.map(x=>x.current),backgroundColor:C.accent,borderRadius:3,order:2},{type:'line',data:d.by_weekday.map(x=>x.baseline),borderColor:C.base,borderWidth:2,pointRadius:0,tension:.3,order:1}]},options:baseOpts(legend2('This window','5-yr avg'))});}
+function drawNbhd(d){destroy('nbhd');charts.nbhd=new Chart($('nbhdChart'),{type:'bar',data:{labels:d.by_nbhd.map(x=>x.name),datasets:[{label:'This window',data:d.by_nbhd.map(x=>x.count),backgroundColor:C.accent,borderRadius:3},{label:'5-yr avg',data:d.by_nbhd.map(x=>x.baseline),backgroundColor:C.base,borderRadius:3}]},options:baseOpts({indexAxis:'y',plugins:{legend:{display:true,labels:{boxWidth:12,font:{size:11},color:'#5c6470'}},tooltip:{callbacks:{afterLabel:c=>c.datasetIndex===0?('median '+d.by_nbhd[c.dataIndex].median+' min'):''}}},scales:{x:{grid:{color:C.grid},beginAtZero:true,ticks:{color:'#5c6470',font:{size:11}}},y:{grid:{display:false},ticks:{color:'#33373d',font:{size:11}}}}})});}
+function drawType(d){const card=$('typeCard');if(!d.by_type||!d.by_type.length){card.style.display='none';return;}card.style.display='';destroy('type');charts.type=new Chart($('typeChart'),{type:'bar',data:{labels:d.by_type.map(x=>x.type+' (n='+x.count.toLocaleString()+')'),datasets:[{data:d.by_type.map(x=>x.median),backgroundColor:C.accent,borderRadius:3}]},options:baseOpts({indexAxis:'y',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>'median '+c.parsed.x+' min'}}},scales:{x:{grid:{color:C.grid},beginAtZero:true,title:{display:true,text:'median handling time (min)',color:'#5c6470',font:{size:11}},ticks:{color:'#5c6470',font:{size:11}}},y:{grid:{display:false},ticks:{color:'#33373d',font:{size:11}}}}})});}
+function drawHeat(d){
+  const el=$('heatmap');el.innerHTML='';
+  const vals=d.heat.flat().filter(v=>v>0);
+  const mx=Math.max(1,...vals),mn=vals.length?Math.min(...vals):0;
+  el.appendChild(document.createElement('span'));
+  for(let h=0;h<24;h++){const c=document.createElement('div');c.className='hlab';c.textContent=(h%3===0)?pad(h):'';el.appendChild(c);}
+  const wd=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  for(let w=0;w<7;w++){
+    const l=document.createElement('div');l.className='lab';l.textContent=wd[w];el.appendChild(l);
+    for(let h=0;h<24;h++){const c=document.createElement('div');c.className='cell';
+      const v=d.heat[w][h];if(v>0)c.style.background=shade(0.08+0.92*((v-mn)/((mx-mn)||1)));
+      c.title=wd[w]+' '+pad(h)+':00 — '+v+' events';el.appendChild(c);}}
+}
+function drawEquip(d){destroy('equip');const e=d.by_equipment.filter(x=>x.current>0||x.baseline>0);
+  charts.equip=new Chart($('equipChart'),{type:'bar',data:{labels:e.map(x=>x.type),datasets:[
+    {label:'This window',data:e.map(x=>x.current),backgroundColor:C.accent,borderRadius:3},
+    {label:'5-yr avg',data:e.map(x=>x.baseline),backgroundColor:C.base,borderRadius:3}]},
+    options:baseOpts({indexAxis:'y',plugins:{legend:{display:true,labels:{boxWidth:12,font:{size:11},color:'#5c6470'}}},scales:{x:{grid:{color:C.grid},beginAtZero:true,ticks:{color:'#5c6470',font:{size:11}}},y:{grid:{display:false},ticks:{color:'#33373d',font:{size:11}}}}})});}
+function drawMovers(d){
+  const el=$('movers'), cap=$('cap-movers');
+  const all=(d.event==='ALL');
+  const evLabel=all?'':d.event.toLowerCase().replace(/\b\w/g,c=>c.toUpperCase());
+  // caption tracks the filter: cross-event radar for All, single-type neighbourhood view otherwise
+  if(cap) cap.innerHTML = all
+    ? 'Event-type &times; neighbourhood cells most divergent from their own 5-yr norm (n &ge; 15, expected &ge; 8/yr, &ge; 25% shift). Across all event types.'
+    : evLabel+' neighbourhoods most divergent from their own 5-yr norm (n &ge; 15, expected &ge; 8/yr, &ge; 25% shift).';
+  if(!d.movers||!d.movers.length){
+    el.innerHTML='<div class="cap" style="padding:6px 0">'+(all
+      ? 'No cell meets the threshold (n &ge; 15, expected &ge; 8/yr) in this window.'
+      : 'No '+evLabel+' neighbourhood meets the threshold (n &ge; 15, expected &ge; 8/yr) in this window.')+'</div>';
+    return;
+  }
+  const head = all
+    ? '<th>Event type</th><th>Neighbourhood</th><th>N</th><th>Expected/yr</th><th>vs norm</th>'
+    : '<th>Neighbourhood</th><th>N</th><th>Expected/yr</th><th>vs norm</th>';
+  el.innerHTML='<table class="movers"><thead><tr>'+head+'</tr></thead><tbody>'+
+    d.movers.map(m=>'<tr>'+(all?'<td>'+m.event+'</td>':'')+'<td>'+m.nbhd+'</td><td>'+m.n+'</td><td>~'+m.expected+'</td><td class="pct" style="color:'+(m.pct>=0?'var(--up)':'var(--down)')+'">'+(m.pct>=0?'+':'')+m.pct+'%</td></tr>').join('')+'</tbody></table>';
+}
+
+async function loadForecast(){
+  const ev=$('event').value;
+  const f=await getJSON('/api/forecast?event='+encodeURIComponent(ev)+'&horizon=6');
+  $('fkpis').innerHTML=
+    '<div class="kpi"><div class="k">Next 6 months — projected volume</div><div class="v">'+fmt(f.total_next)+'</div><div class="d">~80% range '+fmt(f.lo_next)+'–'+fmt(f.hi_next)+'</div></div>'+
+    '<div class="kpi"><div class="k">Level vs 5-yr norm</div><div class="v">'+(f.level==null?'–':'×'+f.level.toFixed(2))+'</div><div class="d">'+(f.level>1.05?'running above norm':f.level<0.95?'running below norm':'tracking norm')+'</div></div>'+
+    '<div class="kpi"><div class="k">Projected event-hours</div><div class="v">'+fmt(f.workload_hours)+' h</div><div class="d">volume × historical median handling time</div></div>'+
+    '<div class="kpi"><div class="k">Volume vs 5-yr norm</div><div class="v">'+(f.level_pct>=0?'+':'')+f.level_pct+'%</div><div class="d">'+(f.data_flag?'large shift — verify ⚠':'within tolerance')+'</div></div>';
+  drawForecast(f);setText('ins-fc',f.insight);
+}
+function drawForecast(f){destroy('fc');
+  const aN=f.actual.length,fN=f.forecast.length;
+  const p=f.partial;const pN=p?1:0;                 // partial (month-to-date) point, if any
+  const labels=f.actual_labels
+    .concat(p?[p.label+' (partial)']:[])
+    .concat(f.forecast.map(x=>x.label));
+  const total=aN+pN+fN;
+  const actual=f.actual.concat(Array(pN+fN).fill(null));
+  const partial=Array(total).fill(null);if(p)partial[aN]=p.value;   // distinct hollow marker
+  // forecast line anchors at the last COMPLETE actual month, skipping the partial slot
+  const mean=Array(aN-1).fill(null).concat([f.actual[aN-1]]).concat(Array(pN).fill(null)).concat(f.forecast.map(x=>x.mean));
+  const lo=Array(aN+pN).fill(null).concat(f.forecast.map(x=>x.lo));
+  const hi=Array(aN+pN).fill(null).concat(f.forecast.map(x=>x.hi));
+  charts.fc=new Chart($('fcChart'),{data:{labels:labels,datasets:[
+    {type:'line',label:'hi',data:hi,borderWidth:0,pointRadius:0,backgroundColor:C.band,fill:'+1'},
+    {type:'line',label:'lo',data:lo,borderWidth:0,pointRadius:0,fill:false},
+    {type:'line',label:'Actual',data:actual,borderColor:C.accent,borderWidth:2,pointRadius:0,tension:.2},
+    {type:'line',label:'Partial (month-to-date)',data:partial,showLine:false,borderColor:C.accent,backgroundColor:'#fff',pointRadius:5,pointStyle:'circle',pointBorderColor:C.accent,pointBorderWidth:2},
+    {type:'line',label:'Forecast',data:mean,borderColor:C.accent,borderWidth:2,borderDash:[6,4],pointRadius:0,tension:.2}]},
+    options:baseOpts({plugins:{legend:{display:true,labels:{boxWidth:12,font:{size:11},color:'#5c6470',filter:i=>i.text==='Actual'||i.text==='Forecast'||i.text==='Partial (month-to-date)'}}},scales:{x:{grid:{display:false},ticks:{color:'#5c6470',font:{size:10},maxRotation:0,autoSkip:true,maxTicksLimit:12}},y:{grid:{color:C.grid},beginAtZero:true,ticks:{color:'#5c6470',font:{size:11}}}}})});}
+
+async function loadMap(){
+  if(!NBHD_GEO)NBHD_GEO=await getJSON('/neighbourhoods.geojson');
+  const g=await getJSON('/api/geo?'+params());
+  if(!map){map=L.map('map',{scrollWheelZoom:false}).setView(g.center,11);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{attribution:'© OpenStreetMap, © CARTO',maxZoom:18}).addTo(map);}
+  if(mapLayer)mapLayer.remove();
+  const above=g.points.filter(p=>p.tier==='above');
+  const byName={};g.points.forEach(p=>byName[p.nbhd.toUpperCase()]=p);
+  const polyNames=new Set(NBHD_GEO.features.map(f=>f.properties.name));
+  const hotNames=new Set(above.map(p=>p.nbhd.toUpperCase()));
+  const maxN=Math.max(1,...g.points.map(p=>p.count));
+  const maxPct=Math.max(30,...above.map(p=>p.pct||0));
+  const sorted=g.points.map(p=>p.count).sort((x,y)=>x-y);
+  const rankOf=c=>sorted.length>1?sorted.indexOf(c)/(sorted.length-1):1;
+  const faint={color:'#d8dde4',weight:.6,fillColor:'#eef1f4',fillOpacity:.35};
+  mapLayer=L.geoJSON(NBHD_GEO,{
+    style:f=>{
+      const p=byName[f.properties.name];
+      if(mapMode==='hot'){
+        if(!p||!hotNames.has(f.properties.name))return faint;
+        return {color:'#fff',weight:1,fillColor:shade(0.55+0.45*(((p.pct||25)-25)/((maxPct-25)||1))),fillOpacity:.85};
+      }
+      if(!p)return faint;
+      return {color:'#fff',weight:1,fillColor:shade(rankOf(p.count)),fillOpacity:.85};
+    },
+    onEachFeature:(f,ly)=>{
+      const p=byName[f.properties.name];
+      const nm=f.properties.name.replace(/\w\S*/g,s=>s[0]+s.slice(1).toLowerCase());
+      ly.bindPopup(p?('<b>'+p.nbhd+'</b><br>'+p.count+' events (median '+p.median+' min)<br>'+(p.pct==null?'small sample':('vs norm ~'+p.expected+': '+(p.pct>=0?'+':'')+p.pct+'%'))):('<b>'+nm+'</b><br>no recorded events this window'));
+    }
+  }).addTo(map);
+  const fit=[];mapLayer.eachLayer(ly=>{if(mapMode!=='hot'||hotNames.has(ly.feature.properties.name))fit.push(ly);});
+  if(fit.length){try{map.fitBounds(L.featureGroup(fit).getBounds().pad(0.15));}catch(e){}}
+  setTimeout(()=>map.invalidateSize(),60);
+  $('mode-hot').style.background=mapMode==='hot'?'var(--accent)':'var(--soft)';$('mode-hot').style.color=mapMode==='hot'?'#fff':'var(--muted)';
+  $('mode-all').style.background=mapMode==='all'?'var(--accent)':'var(--soft)';$('mode-all').style.color=mapMode==='all'?'#fff':'var(--muted)';
+  const noPoly=above.filter(p=>!polyNames.has(p.nbhd.toUpperCase())).length;
+  const polyNote=noPoly?' ('+noPoly+' hotspot(s) lack a 2019 boundary polygon and are not shaded)':'';
+  if(mapMode==='hot'){
+    setText('ins-map', above.length? (above.length+' neighbourhood(s) running >=25% above their 5-year norm — watch list: '+above.slice(0,5).map(p=>p.nbhd+' (+'+p.pct+'%)').join(', ')+'.'+polyNote) : 'No neighbourhood is >=25% above its 5-year norm this window.');
+  } else { setText('ins-map', g.points.length+' neighbourhoods shown; '+above.length+' are >=25% above their 5-year norm — switch to "Hotspots only" to isolate them.'); }
+  const gAll='<span><i style="width:90px;border-radius:5px;background:linear-gradient(90deg,#1b5e20,#81c784,#ffe082,#f9a825,#e53935,#8e1313)"></i>';
+  const gHot='<span><i style="width:90px;border-radius:5px;background:linear-gradient(90deg,#f9a825,#e53935,#8e1313)"></i>';
+  $('map-legend').innerHTML=(mapMode==='hot'?gHot+'+25% &rarr; +'+Math.round(maxPct)+'% above norm</span>':gAll+'volume rank: green = quietest &rarr; red = busiest</span>')+'<span>click an area for details (count, median, vs norm)</span>';
+  $('map-cap').textContent = mapMode==='hot' ? 'Hotspots: neighbourhoods >=25% above their 5-year norm for this window — shading = % above norm.' : 'All neighbourhoods — shading = volume rank this window (green = quietest, red = busiest).';
+}
+function addMsg(who,text,refused){const log=$('chatlog');const d=document.createElement('div');d.className='msg '+(who==='you'?'user':'bot')+(refused?' refused':'');d.innerHTML='<div class="who">'+(who==='you'?'You':'Monitor')+'</div><div class="bubble"></div>';d.querySelector('.bubble').textContent=text;log.appendChild(d);log.scrollTop=log.scrollHeight;}
+async function sendChat(){const q=$('chatq').value.trim();if(!q)return;$('chatq').value='';addMsg('you',q);const r=await postJSON('/api/ask',{q:q});addMsg('bot',r.answer,r.refused);}
+init();
+</script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+services:
+  - type: web
+    name: efrs-workload-monitor
+    runtime: python
+    rootDir: app
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn server:app --preload --workers 1 --timeout 120 --bind 0.0.0.0:$PORT

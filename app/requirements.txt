@@ -1,0 +1,5 @@
+flask>=3.0
+pandas>=2.0
+numpy>=1.24
+gunicorn>=21.2
+google-genai>=1.0  # optional Gemini phrasing layer for the chatbot (activated only when GEMINI_PROJECT or GOOGLE_CLOUD_PROJECT is set)

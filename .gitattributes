@@ -1,0 +1,3 @@
+# Binary caches - never diff these
+*.pkl binary
+app/static/neighbourhoods.geojson binary

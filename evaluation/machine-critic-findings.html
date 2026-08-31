@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Critic Findings — EFRS Workload Monitor · Baseline Run</title>
+<style>
+  :root{
+    --navy:#1a3a5c; --blue:#2b6cb0; --lightblue:#5b9bd5; --bg:#ffffff; --panel:#f4f7fb;
+    --border:#dde5ee; --text:#2d3748; --muted:#718096;
+    --blocker:#c53030; --blocker-bg:#fff5f5;
+    --major:#c05621; --major-bg:#fffaf0;
+    --minor:#2b6cb0; --minor-bg:#ebf4ff;
+    --pass:#276749; --pass-bg:#f0fff4;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif; background:var(--bg); color:var(--text); line-height:1.55; padding-bottom:60px;}
+  .topbar{height:8px; background:linear-gradient(90deg, var(--navy) 45%, var(--lightblue) 45% 80%, #a8c8e8 80%);}
+  .wrap{max-width:1000px; margin:0 auto; padding:32px 28px;}
+  .kicker{color:var(--blue); font-weight:700; font-size:.78rem; letter-spacing:.12em; text-transform:uppercase;}
+  h1{color:var(--navy); font-size:2rem; margin:6px 0 4px; line-height:1.2;}
+  .sub{color:var(--muted); font-size:.92rem; margin-bottom:22px;}
+  .chips{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:26px;}
+  .chip{background:var(--panel); border:1px solid var(--border); border-radius:20px; padding:4px 14px; font-size:.8rem; color:var(--text);}
+  .chip b{color:var(--navy);}
+
+  .cards{display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:30px;}
+  .card{background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:16px 18px;}
+  .card .num{font-size:1.9rem; font-weight:800; color:var(--navy);}
+  .card .lbl{font-size:.78rem; color:var(--muted); text-transform:uppercase; letter-spacing:.05em;}
+  .card.blocker .num{color:var(--blocker);}
+  .card.major .num{color:var(--major);}
+  .card.minor .num{color:var(--minor);}
+  .card.pass .num{color:var(--pass);}
+
+  h2{color:var(--navy); font-size:1.3rem; margin:34px 0 6px; padding-bottom:6px; border-bottom:2px solid var(--border);}
+  .h2note{color:var(--muted); font-size:.85rem; margin-bottom:16px;}
+
+  .note{background:var(--minor-bg); border-left:4px solid var(--lightblue); border-radius:0 8px 8px 0; padding:12px 16px; font-size:.9rem; margin-bottom:22px;}
+
+  .finding{border:1px solid var(--border); border-radius:10px; margin-bottom:18px; overflow:hidden;}
+  .fhead{display:flex; align-items:flex-start; gap:12px; padding:14px 18px; cursor:pointer; background:var(--panel);}
+  .fhead:hover{background:#eaf0f8;}
+  .badge{flex:none; font-size:.7rem; font-weight:800; letter-spacing:.06em; padding:3px 10px; border-radius:12px; margin-top:2px;}
+  .badge.BLOCKER{background:var(--blocker-bg); color:var(--blocker); border:1px solid var(--blocker);}
+  .badge.MAJOR{background:var(--major-bg); color:var(--major); border:1px solid var(--major);}
+  .badge.MINOR{background:var(--minor-bg); color:var(--minor); border:1px solid var(--minor);}
+  .ftitle{font-weight:700; color:var(--navy); font-size:.98rem;}
+  .fid{color:var(--muted); font-weight:700; margin-right:6px;}
+  .caret{margin-left:auto; color:var(--muted); flex:none; transition:transform .15s;}
+  .finding.open .caret{transform:rotate(90deg);}
+  .fbody{display:none; padding:16px 20px; border-top:1px solid var(--border);}
+  .finding.open .fbody{display:block;}
+  .frow{margin-bottom:10px; font-size:.92rem;}
+  .frow .k{font-weight:700; color:var(--navy); display:inline-block; min-width:86px;}
+  .ev{background:#f7f9fc; border:1px solid var(--border); border-radius:6px; padding:10px 14px; font-family:Consolas,Menlo,monospace; font-size:.82rem; color:#374151; white-space:pre-wrap; margin-top:4px;}
+
+  .triage{margin-top:14px; padding:12px 14px; background:#fbfcfe; border:1px dashed var(--border); border-radius:8px;}
+  .triage .tlbl{font-size:.75rem; font-weight:800; letter-spacing:.08em; color:var(--navy); text-transform:uppercase; margin-bottom:8px;}
+  .tbtns{display:flex; gap:8px; margin-bottom:8px;}
+  .tbtn{border:1px solid var(--border); background:#fff; border-radius:6px; padding:5px 16px; font-size:.85rem; cursor:pointer; font-weight:600; color:var(--muted);}
+  .tbtn.sel.accept{background:var(--pass-bg); color:var(--pass); border-color:var(--pass);}
+  .tbtn.sel.reject{background:var(--blocker-bg); color:var(--blocker); border-color:var(--blocker);}
+  .tbtn.sel.defer{background:var(--major-bg); color:var(--major); border-color:var(--major);}
+  .triage textarea{width:100%; border:1px solid var(--border); border-radius:6px; padding:8px 10px; font-size:.85rem; font-family:inherit; resize:vertical; min-height:40px;}
+  .thint{font-size:.75rem; color:var(--muted); margin-top:4px;}
+
+  table{width:100%; border-collapse:collapse; font-size:.88rem; margin-bottom:8px;}
+  th{background:var(--panel); color:var(--navy); text-align:left; padding:8px 12px; border:1px solid var(--border); font-size:.8rem; text-transform:uppercase; letter-spacing:.04em;}
+  td{padding:8px 12px; border:1px solid var(--border); vertical-align:top;}
+  td.ok{color:var(--pass); font-weight:700; white-space:nowrap;}
+
+  .closing{background:var(--panel); border-left:4px solid var(--navy); border-radius:0 10px 10px 0; padding:18px 22px; font-size:.95rem; margin-top:10px;}
+  .closing b{color:var(--navy);}
+
+  .toolrow{display:flex; gap:10px; margin:18px 0 8px;}
+  .action{background:var(--navy); color:#fff; border:none; border-radius:6px; padding:9px 18px; font-size:.88rem; font-weight:600; cursor:pointer;}
+  .action.secondary{background:#fff; color:var(--navy); border:1px solid var(--navy);}
+  .savenote{font-size:.78rem; color:var(--muted); align-self:center;}
+
+  footer{margin-top:44px; padding-top:14px; border-top:1px solid var(--border); font-size:.78rem; color:var(--muted); display:flex; justify-content:space-between;}
+  @media print{ .fbody{display:block !important;} .toolrow{display:none;} .fhead{cursor:default;} .caret{display:none;} }
+  @media (max-width:720px){ .cards{grid-template-columns:repeat(2,1fr);} }
+</style>
+</head>
+<body>
+<div class="topbar"></div>
+<div class="wrap">
+
+  <div class="kicker">Governance Agent · Baseline Run</div>
+  <h1>Critic Findings — EFRS Incident Duration &amp; Workload Monitor</h1>
+  <div class="sub">Run date 2026-07-03 · Fresh-context critic per <b>critic-brief.md</b> · Target: local app (<code>app/server.py</code>), static snapshot · the project team</div>
+
+  <div class="chips">
+    <span class="chip"><b>Independence held:</b> critic saw only AGENTS.md, index.html, API payloads, refusal_log.csv, raw CSV</span>
+    <span class="chip"><b>Never saw:</b> server.py, build conversation</span>
+    <span class="chip"><b>Oracle:</b> reproduced exactly</span>
+  </div>
+
+  <div class="cards">
+    <div class="card blocker"><div class="num">1</div><div class="lbl">Blocker</div></div>
+    <div class="card major"><div class="num">4</div><div class="lbl">Major</div></div>
+    <div class="card minor"><div class="num">5</div><div class="lbl">Minor</div></div>
+    <div class="card pass"><div class="num">14</div><div class="lbl">Checks passed</div></div>
+  </div>
+
+  <div class="note"><b>Run note from the critic:</b> the documented chat request shape <code>{"question": ...}</code> returns a generic fallback for every question; the frontend actually sends <code>{"q": ...}</code> (index.html line 251), so chatbot tests were re-run with that key. The mismatch is Finding 7.</div>
+
+  <h2>Findings — every one gets a verdict, from you</h2>
+  <div class="h2note">Click a finding to expand. A critic's finding is a claim, not a fact: mark each Accept / Reject / Defer with a written reason. Verdicts are saved in this browser and included in the export.</div>
+
+  <div class="toolrow">
+    <button class="action" onclick="exportTriage()">Export triage record (.md)</button>
+    <button class="action secondary" onclick="toggleAll()">Expand / collapse all</button>
+    <span class="savenote">Triage auto-saves locally as you type.</span>
+  </div>
+
+  <div id="findings"></div>
+
+  <h2>Checked, passed</h2>
+  <div class="h2note">Silence is not a pass — every checked claim is listed with one line of evidence.</div>
+  <table>
+    <tr><th style="width:32%">Check</th><th style="width:10%">Result</th><th>Evidence</th></tr>
+    <tr><td>Oracle recompute (MVI 2026 YTD)</td><td class="ok">✓ Pass</td><td>Independent raw-CSV recompute: n=2,919, median 26.0, p90 69.0, volume +35.0% — matches /api/metrics exactly.</td></tr>
+    <tr><td>Geo spot-check vs raw CSV</td><td class="ok">✓ Pass</td><td>Downtown MVI 2026: count 54 / median 19.5 / expected 47 vs recompute 54 / 19.5 / 47.2; Anthony Henday +86% vs +86.05%.</td></tr>
+    <tr><td>No response-time / arrival / turnout / NFPA framing</td><td class="ok">✓ Pass</td><td>Terms appear only in explicit negations ("not response time") and refusal text.</td></tr>
+    <tr><td>No full-year 2026 in metrics views</td><td class="ok">✓ Pass</td><td>YTD everywhere; "(partial, YTD)" dropdown label; warning chip; <code>partial: true</code>. (Finding 3 is the monthly-chart analogue.)</td></tr>
+    <tr><td>Non-incident exclusion applied &amp; stated</td><td class="ok">✓ Pass</td><td>Exclusion chip on screen; oracle recompute excluding the four types matches to the row.</td></tr>
+    <tr><td>response_code never given meaning beyond AL</td><td class="ok">✓ Pass</td><td>Never surfaced in UI/payloads; chatbot declines to define code "D".</td></tr>
+    <tr><td>No station / address-level claims on claim surface</td><td class="ok">✓ Pass</td><td>No station field anywhere; neighbourhood polygons only; nearest-intersection note in footer. (Finding 5 is a missing refusal, not a wrong claim.)</td></tr>
+    <tr><td>No causal / predictive claims on-screen</td><td class="ok">✓ Pass</td><td>Forecast captioned "Volume only — not response time... not causal." (Finding 6 covers unrendered payload text.)</td></tr>
+    <tr><td>N shown with every metric; median+p90, never mean alone</td><td class="ok">✓ Pass</td><td>N on KPI card, headline, type labels ("Medical (n=15,641)"), geo popups; mean exists in payloads but is never rendered.</td></tr>
+    <tr><td>Chatbot refuses + explains + logs forbidden asks</td><td class="ok">✓ Pass</td><td>Response-time and NFPA asks refused with correct explanation; two new rows in refusal_log.csv.</td></tr>
+    <tr><td>Chatbot gives real decision support (not a KPI echo)</td><td class="ok">✓ Pass</td><td>"Plan crews for downtown fire" → volume vs norm (+30%), small-N honesty (n=42), simultaneous-load estimate, outlook, closes "the staffing call is yours."</td></tr>
+    <tr><td>UNKNOWN toggle &amp; dropdowns change numbers correctly</td><td class="ok">✓ Pass</td><td>Include adds Unknown row (1,538) + one geo point; all recomputed slices (MVI 2026, ALL 2026, RESCUE 2016, VF 2011) match raw CSV.</td></tr>
+    <tr><td>Forecast data_flag at ±15% level threshold</td><td class="ok">✓ Pass</td><td>Off at −13.9% (ALL), on at +36% (MVI) with "verify — may be a reporting change" wording.</td></tr>
+    <tr><td>Small-N suppression in geo</td><td class="ok">✓ Pass</td><td>expected&lt;3 → <code>pct: null</code>, tier "normal", "small sample" popup (e.g. Anthony Henday Castledowns, count 11, expected 2).</td></tr>
+  </table>
+
+  <h2>Critic's closing read</h2>
+  <div class="closing">
+    Could the performance lead reach a defensible decision in under a minute? <b>Yes, narrowly.</b>
+    The spine is sound — headline, KPIs with N, flags, and the map watch-list form a sub-minute path, and every recomputed slice was exactly right.
+    The stalls are at the edges of defensibility: the 55–60 bar is wrong if quoted (F1), the footer N won't survive a recount (F2), June 2026 reads as a collapse on the Forecast tab (F3), and a "which station" follow-up gets a shrug instead of the designed refusal (F5).
+    None blocks the weekly attention decision; all are exactly the kind of number or reading that gets repeated in a review and then falls over.
+    <i>Findings are claims, not facts — triage verdicts stay with the group.</i>
+  </div>
+
+  <footer><span>the project team</span><span>Critic baseline · independent run before same-day fixes</span></footer>
+</div>
+
+<script>
+const FINDINGS = [
+ {id:1, sev:"BLOCKER", title:"Distribution chart's last bar is labelled “55-60” but contains every event ≥55 min, erasing the long right tail on the default screen",
+  where:"/api/metrics?year=2026&event=ALL → dist[-1]; rendered verbatim by drawDist() (index.html line 174), Overview tab, default filters",
+  expected:"§2: “the distribution has a long right tail (overall median 14 min, mean 23.3, p99 189)”; figures the lead “can… defend in a review”",
+  observed:"Last bin {“bin”: “55-60”, “count”: 1403} for ALL 2026. Raw-CSV recompute: only 232 events are truly 55–60 min; 1,171 are ≥60 min (up to hours). MVI 2026: bin shows 486, true 55–60 is 91, ≥60 is 395. The chart asserts ~4.4% of events close in 55–60 min when most of that bar is unbounded tail.",
+  evidence:"Recompute on cleaned YTD 2026: >=55: 1403, true 55-60: 232, >=60: 1171 — the API's 1,403 exactly equals the ≥55 catch-all. No “60+” label exists anywhere in index.html."},
+ {id:2, sev:"MAJOR", title:"On-screen “valid incidents after cleaning” total (450,433) and UNKNOWN 15.1% include 22,933 junk-type rows the spec's own cleaning rule drops",
+  where:"/api/meta (n_total, unknown_pct); footer “450,433 valid incidents in the YTD window after cleaning” (index.html line 170); UNKNOWN chip",
+  expected:"Backend spec: “drop junk event types (blank/NULL/MESS/len<4/<500 rows)”; §2: “Every metric shows its N”",
+  observed:"Spec-rule recompute: YTD N = 427,500, UNKNOWN = 11.4%. Junk-kept recompute: 450,433 / 15.1% exactly. Slice metrics DO exclude junk (ALL 2026 n = 32,068 ≈ junk-dropped 32,056) — so the footer N is inconsistent with every chart under it. The spec also disagrees with itself: its “~922,550 valid incidents” matches junk-kept, while its own rules reproduce 890,938.",
+  evidence:"YTD keeping junk types: 450433, unknown pct: 15.1, junk rows kept: 22933 — vs spec-rule recompute 427500 / 11.4%. Residual ±12 rows on ALL 2026 shows the junk rule is ambiguous as written."},
+ {id:3, sev:"MAJOR", title:"Forecast chart plots partial June 2026 (window ends Jun 25) as a full “actual” month, reading as a demand collapse",
+  where:"/api/forecast?event=ALL&horizon=6 → actual series; Forecast tab line chart (“Solid = recorded events”)",
+  expected:"§2 must-never 2 (monthly analogue): no chart that lets 2026 read as complete; level computed “from completed months only” exists precisely to avoid this",
+  observed:"Last actual point Jun 26 = 4,320 (Jun 1–25 only) vs May 26 = 5,686, Jun 24 = 6,347, Jun 25 = 6,567 — a ~24% apparent single-month plunge with no partial-month marker, caption, or exclusion. The level factor correctly ignores it; the lead's eye doesn't.",
+  evidence:"Payload actual tail: [5558, 5059, 5686, 4320]; raw recompute Jun 2026 (to 25th) = 4,316. Nothing in index.html (lines 190–202) or captions flags the last point as partial."},
+ {id:4, sev:"MAJOR", title:"With no baseline (earliest years) or zero matches, the app asserts “Handling time is down” and “tracks the 5-year norm” against a norm that does not exist",
+  where:"/api/metrics?year=2011&event=VEHICLE FIRE (kpi + flags); /api/metrics?year=2026&event=UNICORN ATTACK (flags, n=0)",
+  expected:"§2: figures the lead can “defend in a review”; the gold example always states the comparison basis",
+  observed:"VF 2011: baseline {n: 0, median: null}, baseline_years: [], yet the kpi ends “n = 194 (no baseline). Handling time is down.” (down vs nothing) and flags say “Nothing unusual this period — volume and handling time track the 5-year norm.” A nonsense event type (n=0) returns the same reassurance.",
+  evidence:"Both payloads HTTP 200 with the quoted text. The “(no baseline)” honesty in the same sentence contradicts the two claims beside it."},
+ {id:5, sev:"MAJOR", title:"“Which station is the slowest?” is not refused: the claim-guard misses direct station-performance asks and answers with a citywide KPI",
+  where:"POST /api/ask, body {“q”: “Which station is the slowest?”}",
+  expected:"Backend spec: “claim-guard gate first: refuse + log… any response/arrival-time, turnout/NFPA, or station-performance ask”; §3 refuses station-level performance",
+  observed:"refused: None; answer = the generic ALL-2026 KPI (“Median handling time (dispatch→close) 13.0 min… n = 32,068…”). Not logged. No wrong claim is made, but the designed refusal never fires and the §6 “how often it's requested” telemetry undercounts.",
+  evidence:"Ask transcript + refusal_log.csv tail showing only the two response-time/NFPA entries from this run."},
+ {id:6, sev:"MINOR", title:"/api/metrics and /api/forecast payloads carry prescriptive “recommendation” text the spec forbids at those endpoints; a dead “Recommendation:” renderer ships in the page",
+  where:"insights.rec_dist/rec_hour/rec_nbhd/rec_weekday in metrics; rec in forecast; index.html line 129 setMeans()",
+  expected:"Backend spec: “Insights are descriptive only (no prescriptive 'recommendation' text)”; Forecast tab “No recommendation block”; prescriptive text only in the chatbot",
+  observed:"Payloads contain “Plan unit commitment for ~69 min…”, “Concentrate peak crews 15:00–18:00…”, “Prioritise Downtown…”, “Budget for ~3,950… size to the upper bound (4,968)…”. The UI never renders them (setMeans defined, never called), so the visible tabs pass — but the endpoint contract is violated and one dead-code path from shipping.",
+  evidence:"Payload excerpts above; grep setMeans index.html → definition only, zero call sites."},
+ {id:7, sev:"MINOR", title:"The documented chat request shape silently bypasses the refusal gate: {“question”: …} gets the generic fallback, unrefused and unlogged",
+  where:"POST /api/ask with {“question”: “What is our average response time downtown?”}; the frontend sends {q: …} (index.html line 251)",
+  expected:"§6: refusal “is logged so we can see how often it's requested”",
+  observed:"Every question under the question key — including the forbidden one — returns “Ask about volume, handling time, the forecast…” with no refused flag and no log entry. Any non-frontend client using the documented key gets no governance.",
+  evidence:"Five-question transcript, identical fallback each time; log timestamp unchanged until re-run with {“q”: …}."},
+ {id:8, sev:"MINOR", title:"The same slice reports three different hotspot counts: metrics flag 109, geo note 111, spec-rule recompute ~122",
+  where:"/api/metrics?year=2026&event=MOTOR VEHICLE INCIDENT&unknown=exclude flag vs /api/geo (same params) note/above",
+  expected:"Backend spec geo: “tier (above/normal/below; suppress % when expected < 3)” — one definition, one number",
+  observed:"Metrics flag: “109 neighbourhood(s) >=25% above their own norm”; geo note on the same screen: “111 neighbourhood(s) running >=25% above the 2021-2025 YTD norm”; recompute applying the spec's words (pct ≥25%, expected ≥3) gives 122. Spot-checked points are exact (Downtown 54 vs expected 47), so this is definition drift, not bad data.",
+  evidence:"Both payload strings; recompute: my hotspot count (expected>=3, pct>=25): 122."},
+ {id:9, sev:"MINOR", title:"Including UNKNOWN creates a pseudo-neighbourhood “Unknown” geo point with a computed centroid in central Edmonton, topping the hotspot watch-list",
+  where:"/api/geo?year=2026&event=MOTOR VEHICLE INCIDENT&unknown=include; Overview map watch-list (count-sorted, Unknown largest)",
+  expected:"§4: “UNKNOWN neighbourhood is a literal value… not missing”; §2: neighbourhood views state their UNKNOWN policy; must-never 5: no precise-location claims",
+  observed:"Added point {“nbhd”: “Unknown”, “count”: 162, “expected”: 49, “pct”: 228, “tier”: “above”, “lat”: 53.537, “lon”: −113.505} — events with no known area assigned a coordinate near Downtown and ranked the #1 watch-list entry (“Unknown (+228%)”). The +228% may be a real recording signal, but presenting it as a placed, tiered “area” misleads.",
+  evidence:"Include-vs-exclude geo diff: 349→350 points, above 111→112."},
+ {id:10, sev:"MINOR", title:"Odd params degrade to wrong or falsely reassuring text: horizon=0's rec says “next 6 months” for a 1-month total; year=2010 silently returns 2026",
+  where:"/api/forecast?event=ALL&horizon=0; /api/metrics?year=2010&event=ALL",
+  expected:"Honest labelling throughout (§2)",
+  observed:"horizon=0 clamps to 1 (good) and the insight correctly says “next 1 months”, but the unrendered rec describes the 1-month total as “over the next 6 months” (see Finding 6). year=2010 returns HTTP 200 with 2026 data — self-labelled, so survivable, but with no notice the requested year was rejected.",
+  evidence:"fc_h0 payload: horizon: 1, total_next: 6402, rec “next 6 months”; year=2010 response tail: “year”:2026, n=32068."}
+];
+
+const container = document.getElementById('findings');
+FINDINGS.forEach(f => {
+  const div = document.createElement('div');
+  div.className = 'finding' + (f.sev === 'BLOCKER' ? ' open' : '');
+  div.id = 'f' + f.id;
+  div.innerHTML = `
+    <div class="fhead" onclick="this.parentElement.classList.toggle('open')">
+      <span class="badge ${f.sev}">${f.sev}</span>
+      <span class="ftitle"><span class="fid">F${f.id}</span>${f.title}</span>
+      <span class="caret">▶</span>
+    </div>
+    <div class="fbody">
+      <div class="frow"><span class="k">Where</span> ${f.where}</div>
+      <div class="frow"><span class="k">Expected</span> ${f.expected}</div>
+      <div class="frow"><span class="k">Observed</span> ${f.observed}</div>
+      <div class="frow"><span class="k">Evidence</span><div class="ev">${f.evidence}</div></div>
+      <div class="triage">
+        <div class="tlbl">Your verdict — Triage F${f.id}</div>
+        <div class="tbtns">
+          <button class="tbtn accept" onclick="setVerdict(${f.id}, 'Accept', this)">Accept</button>
+          <button class="tbtn reject" onclick="setVerdict(${f.id}, 'Reject', this)">Reject</button>
+          <button class="tbtn defer"  onclick="setVerdict(${f.id}, 'Defer', this)">Defer</button>
+        </div>
+        <textarea id="reason${f.id}" placeholder="Written reason (required — a rejection without a reason is a dodge; the viva will probe this)" oninput="saveTriage()"></textarea>
+        <div class="thint">Accept = real, on the fix list · Reject = critic is wrong / behaviour intended · Defer = real, parked past Saturday</div>
+      </div>
+    </div>`;
+  container.appendChild(div);
+});
+
+let triage = {};
+try { triage = JSON.parse(localStorage.getItem('efrs_critic_triage') || '{}'); } catch(e) {}
+FINDINGS.forEach(f => {
+  const t = triage[f.id];
+  if (!t) return;
+  if (t.verdict) {
+    const btn = document.querySelector(`#f${f.id} .tbtn.${t.verdict.toLowerCase()}`);
+    if (btn) btn.classList.add('sel');
+  }
+  if (t.reason) document.getElementById('reason' + f.id).value = t.reason;
+});
+
+function setVerdict(id, v, btn) {
+  btn.parentElement.querySelectorAll('.tbtn').forEach(b => b.classList.remove('sel'));
+  btn.classList.add('sel');
+  triage[id] = triage[id] || {};
+  triage[id].verdict = v;
+  saveTriage();
+}
+function saveTriage() {
+  FINDINGS.forEach(f => {
+    triage[f.id] = triage[f.id] || {};
+    triage[f.id].reason = document.getElementById('reason' + f.id).value;
+  });
+  try { localStorage.setItem('efrs_critic_triage', JSON.stringify(triage)); } catch(e) {}
+}
+function toggleAll() {
+  const els = document.querySelectorAll('.finding');
+  const anyClosed = [...els].some(e => !e.classList.contains('open'));
+  els.forEach(e => e.classList.toggle('open', anyClosed));
+}
+function exportTriage() {
+  saveTriage();
+  let md = '# Triage Record — Critic Baseline Run (2026-07-03)\n\n| # | Severity | Finding | Verdict | Reason |\n|---|----------|---------|---------|--------|\n';
+  FINDINGS.forEach(f => {
+    const t = triage[f.id] || {};
+    md += `| F${f.id} | ${f.sev} | ${f.title.replace(/\|/g,'\\|')} | ${t.verdict || '—'} | ${(t.reason || '').replace(/\n/g,' ').replace(/\|/g,'\\|')} |\n`;
+  });
+  const blob = new Blob([md], {type: 'text/markdown'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'triage-record.md';
+  a.click();
+}
+</script>
+</body>
+</html>

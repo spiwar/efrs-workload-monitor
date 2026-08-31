@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Deployment Assessment — EFRS Workload Monitor · the project team</title>
+<style>
+  :root{
+    --navy:#1a3a5c; --blue:#2b6cb0; --lightblue:#5b9bd5; --bg:#ffffff; --panel:#f4f7fb;
+    --border:#dde5ee; --text:#2d3748; --muted:#718096;
+    --accept:#276749; --accept-bg:#f0fff4;
+    --defer:#c05621; --defer-bg:#fffaf0;
+    --reject:#c53030; --reject-bg:#fff5f5;
+    --blocker:#c53030; --major:#c05621; --minor:#2b6cb0; --note:#4a5568;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif; background:var(--bg); color:var(--text); line-height:1.6; padding-bottom:60px;}
+  .topbar{height:8px; background:linear-gradient(90deg, var(--navy) 45%, var(--lightblue) 45% 80%, #a8c8e8 80%);}
+  .wrap{max-width:1040px; margin:0 auto; padding:34px 28px;}
+  .kicker{color:var(--blue); font-weight:700; font-size:.78rem; letter-spacing:.12em; text-transform:uppercase;}
+  h1{color:var(--navy); font-size:2.05rem; margin:6px 0 4px; line-height:1.2;}
+  .sub{color:var(--muted); font-size:.95rem; margin-bottom:14px;}
+  .lead{background:var(--panel); border-left:4px solid var(--lightblue); border-radius:0 8px 8px 0; padding:14px 18px; font-size:.95rem; margin:18px 0 30px;}
+  .lead b{color:var(--navy);}
+
+  h2{color:var(--navy); font-size:1.35rem; margin:38px 0 6px; padding-bottom:7px; border-bottom:2px solid var(--border);}
+  h2 .n{color:var(--lightblue); font-weight:800; margin-right:8px;}
+  h3{color:var(--navy); font-size:1.05rem; margin:22px 0 8px;}
+  p{margin:10px 0;}
+  .muted{color:var(--muted);}
+
+  table{width:100%; border-collapse:collapse; font-size:.86rem; margin:14px 0 8px;}
+  th{background:var(--navy); color:#fff; text-align:left; padding:9px 11px; font-size:.72rem; text-transform:uppercase; letter-spacing:.04em; vertical-align:top;}
+  td{padding:9px 11px; border:1px solid var(--border); vertical-align:top;}
+  tbody tr:nth-child(even){background:#fafcfe;}
+  td.id{font-weight:800; color:var(--navy); white-space:nowrap;}
+  code{background:#eef2f7; border-radius:4px; padding:1px 5px; font-family:Consolas,Menlo,monospace; font-size:.85em; color:#33415c;}
+
+  .badge{display:inline-block; font-size:.68rem; font-weight:800; letter-spacing:.04em; padding:2px 8px; border-radius:11px; white-space:nowrap;}
+  .b-accept{background:var(--accept-bg); color:var(--accept); border:1px solid var(--accept);}
+  .b-defer{background:var(--defer-bg); color:var(--defer); border:1px solid var(--defer);}
+  .b-reject{background:var(--reject-bg); color:var(--reject); border:1px solid var(--reject);}
+  .sev{display:inline-block; font-size:.68rem; font-weight:800; padding:2px 8px; border-radius:11px; white-space:nowrap;}
+  .s-blocker{background:var(--reject-bg); color:var(--blocker); border:1px solid var(--blocker);}
+  .s-major{background:var(--defer-bg); color:var(--major); border:1px solid var(--major);}
+  .s-minor{background:#ebf4ff; color:var(--minor); border:1px solid var(--minor);}
+  .s-note{background:#edf2f7; color:var(--note); border:1px solid #cbd5e0;}
+
+  .cards{display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin:24px 0 6px;}
+  .card{background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:15px 16px;}
+  .card .num{font-size:1.7rem; font-weight:800; color:var(--navy);}
+  .card .lbl{font-size:.75rem; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; margin-top:2px;}
+  .card.green .num{color:var(--accept);} .card.orange .num{color:var(--defer);}
+
+  .ba td:nth-child(2){color:var(--reject);} .ba td:nth-child(3){color:var(--accept); font-weight:600;}
+  .ba td:nth-child(1){font-weight:700; color:var(--navy);}
+  .ba .same td:nth-child(2), .ba .same td:nth-child(3){color:var(--muted); font-weight:400;}
+
+  ul{margin:10px 0 10px 4px; padding-left:20px;} li{margin:7px 0;}
+  .gap li b{color:var(--navy);}
+  .builtbox{background:#f0f7ff; border:1px solid #cfe0f3; border-radius:10px; padding:16px 20px; margin:14px 0;}
+  .builtbox .tag{display:inline-block; background:var(--navy); color:#fff; font-size:.7rem; font-weight:700; letter-spacing:.05em; padding:3px 10px; border-radius:6px; text-transform:uppercase; margin-bottom:8px;}
+  .pull{font-size:1.02rem; color:var(--navy); font-weight:600; border-left:4px solid var(--lightblue); padding:4px 0 4px 14px; margin:12px 0;}
+  .judgment{background:var(--panel); border-left:4px solid var(--navy); border-radius:0 10px 10px 0; padding:18px 22px; font-size:.97rem; margin-top:10px;}
+
+  footer{margin-top:44px; padding-top:14px; border-top:1px solid var(--border); font-size:.78rem; color:var(--muted); display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px;}
+  @media (max-width:760px){ .cards{grid-template-columns:repeat(2,1fr);} table{font-size:.8rem;} th,td{padding:7px 8px;} }
+</style>
+</head>
+<body>
+<div class="topbar"></div>
+<div class="wrap">
+
+  <div class="kicker">Deployment Review</div>
+  <h1>Deployment Assessment</h1>
+  <div class="sub">EFRS Incident Duration &amp; Workload Monitor · the project team · 2026-07-03</div>
+
+  <div class="lead">
+    One pass through the loop: <b>triage the evidence → classify and fix → re-run the critic → write it down.</b>
+    The bar for every decision was <b>Story&nbsp;#1 — Dana, the Operations / Performance Lead asking "are fire cases running hot?"</b>
+    She needs a number she can defend in the Monday ops review. If she'd quote it out loud, we fixed it. If the user never sees it, we parked it — and said so.
+  </div>
+
+  <div class="cards">
+    <div class="card green"><div class="num">6</div><div class="lbl">Accepted &amp; fixed</div></div>
+    <div class="card orange"><div class="num">5</div><div class="lbl">Deferred on purpose</div></div>
+    <div class="card"><div class="num">14</div><div class="lbl">Critic checks passed</div></div>
+    <div class="card"><div class="num">0</div><div class="lbl">Oracle numbers moved</div></div>
+  </div>
+
+  <!-- ================= 1 ================= -->
+  <h2><span class="n">1</span>What the critics found, and what we decided</h2>
+  <p>Three streams of evidence: a <b>machine critic</b> (10 findings, fresh context, never saw our source code), the <b>human pitch feedback</b> (3 notes), and the <b>use-week logs</b>. Every item got a verdict and a reason. We fixed the ones that touch a number Dana would quote; we deferred the ones that never reach a screen.</p>
+
+  <table>
+    <thead>
+      <tr><th style="width:6%">#</th><th style="width:8%">Source</th><th style="width:9%">Sev</th><th style="width:31%">Finding (plain language)</th><th style="width:11%">Verdict</th><th>Reason</th></tr>
+    </thead>
+    <tbody>
+      <tr><td class="id">F1</td><td>Machine</td><td><span class="sev s-blocker">Blocker</span></td><td>The handling-time chart's last bar says "55-60 min" but actually holds <b>everything ≥ 55 min</b> — most of it runs well past an hour. Hides the long tail.</td><td><span class="badge b-accept">Accept · fixed</span></td><td>Dana could quote "most cases close in under an hour" and be wrong. A defensibility failure.</td></tr>
+      <tr><td class="id">F2</td><td>Machine</td><td><span class="sev s-major">Major</span></td><td>The footer's "450,433 valid incidents / 15.1% UNKNOWN" <b>includes 22,933 junk rows</b> the cleaning rule says to drop — so the total disagrees with every chart under it.</td><td><span class="badge b-accept">Accept · fixed</span></td><td>Story #1 is "a traceable number she can defend." A headline that doesn't reconcile with the charts fails on sight.</td></tr>
+      <tr><td class="id">F3</td><td>Machine</td><td><span class="sev s-major">Major</span></td><td>The forecast plots the <b>partial current month (Jun 1-25) as a full month</b>, so June looks like a demand collapse.</td><td><span class="badge b-accept">Accept · fixed</span></td><td>Same trap as a full-year-2026 read, one tab over. The eye reads the dip even though the math ignores it.</td></tr>
+      <tr><td class="id">F4</td><td>Machine</td><td><span class="sev s-major">Major</span></td><td>For the earliest years or a no-match filter, the app asserts <b>"Handling time is down"</b> and <b>"nothing unusual — tracks the norm"</b> against a baseline that <b>doesn't exist</b>.</td><td><span class="badge b-accept">Accept · fixed</span></td><td>Our "partial agreement": 2011 shows no baseline, yet the app still claimed a direction. A reassurance with no norm behind it is worse than silence.</td></tr>
+      <tr><td class="id">F5</td><td>Machine</td><td><span class="sev s-major">Major</span></td><td>"Which station is the slowest?" is <b>not refused</b> — it answers with a citywide KPI. The refusal was designed but never fired for that phrasing.</td><td><span class="badge b-accept">Accept · fixed</span></td><td>Refusal is a feature (§6). A missed refusal also undercounts the §6 "how often is this asked" telemetry.</td></tr>
+      <tr><td class="id">F7</td><td>Machine</td><td><span class="sev s-minor">Minor</span></td><td>The documented <code>{"question":…}</code> request shape <b>bypasses the refusal gate</b> — every ask under that key gets a generic fallback, unlogged.</td><td><span class="badge b-accept">Accept · fixed</span></td><td>A governance hole, not cosmetics: a non-frontend client gets zero guardrails. The fix was one line, so we took it with F5.</td></tr>
+      <tr><td class="id">F6</td><td>Machine</td><td><span class="sev s-minor">Minor</span></td><td><code>/api/metrics</code> &amp; <code>/api/forecast</code> carry prescriptive "recommendation" text the spec bans there; a dead renderer ships in the page.</td><td><span class="badge b-defer">Defer</span></td><td>Nothing renders it — no screen shows prescriptive text outside the chatbot. Contract is loose, but invisible to the user.</td></tr>
+      <tr><td class="id">F8</td><td>Machine</td><td><span class="sev s-minor">Minor</span></td><td>The same slice reports <b>109 vs 111</b> hotspots (metrics flag vs geo note) from different rounding at the 25% edge.</td><td><span class="badge b-defer">Defer</span></td><td>Both directionally right; underlying points spot-check exact. A one-neighbourhood drift doesn't change where an officer is sent.</td></tr>
+      <tr><td class="id">F9</td><td>Machine</td><td><span class="sev s-minor">Minor</span></td><td>Including UNKNOWN puts a placed "Unknown" point at a central-Edmonton centroid, topping the watch-list.</td><td><span class="badge b-defer">Defer</span></td><td>Default <b>excludes</b> UNKNOWN and states the policy, so the misleading view only appears if the lead opts in.</td></tr>
+      <tr><td class="id">F10</td><td>Machine</td><td><span class="sev s-minor">Minor</span></td><td>Odd params (<code>horizon=0</code>, <code>year=2010</code>) degrade to reasonable data with imperfect labels.</td><td><span class="badge b-defer">Defer</span></td><td>Self-labelled and survivable; nobody drives these in a real review.</td></tr>
+      <tr><td class="id">P1</td><td>Pitch</td><td><span class="sev s-note">Note</span></td><td>Too much build/governance, not enough user benefit; open with who the user is and what decision gets easier.</td><td><span class="badge b-accept">Accept</span></td><td>The most consistent note. App-side answer: three user stories now sit <b>at the top of AGENTS.md</b>, benefit-first.</td></tr>
+      <tr><td class="id">P2</td><td>Pitch</td><td><span class="sev s-note">Note</span></td><td>Content felt AI-heavy, text-heavy, repetitive.</td><td><span class="badge b-defer">Accept · deck deferred</span></td><td>Real, but a deck rewrite, not an app change. Parked with the reason recorded.</td></tr>
+      <tr><td class="id">P3</td><td>Pitch</td><td><span class="sev s-note">Note</span></td><td>Add guardrails / input validation to the chatbot; offer a live daily feed, not a frozen snapshot.</td><td><span class="badge b-accept">Part built · rest fixed</span></td><td>The live feed already exists (<code>/api/refresh</code>). The guardrail gap <b>is</b> F5/F7 — now fixed.</td></tr>
+      <tr><td class="id">U1</td><td>Use-week</td><td><span class="sev s-note">Log</span></td><td>The refusal log shows <b>~20 refusals, almost all "average response time"</b> variants.</td><td><span class="badge b-accept">Informs design</span></td><td>The most-requested thing is the one thing we correctly refuse. Validates the refusal design and the "we don't do response time" framing.</td></tr>
+    </tbody>
+  </table>
+  <p class="muted"><b>Rejected:</b> none outright. The critic's 14 passed checks (oracle recompute, geo spot-checks, no response-time framing, exclusion applied, N shown everywhere, refusal + decision-support working) we accept as-is — that's the spine, and it held.</p>
+
+  <!-- ================= 2 ================= -->
+  <h2><span class="n">2</span>The evidence — before &amp; after</h2>
+  <p>Same app, same static snapshot, re-run against the same brief after the fixes. Numbers are straight from the live API.</p>
+
+  <table class="ba">
+    <thead><tr><th style="width:30%">Check (Story #1's lens)</th><th style="width:35%">Before (baseline run)</th><th>After (this afternoon)</th></tr></thead>
+    <tbody>
+      <tr class="same"><td>Oracle — MVI 2026 YTD vs 2021-25</td><td>median 26 / p90 69 / n 2,919 / +35%</td><td>Unchanged: 26 / 69 / 2,919 / +35% — fixes didn't move the real numbers</td></tr>
+      <tr><td>F1 · distribution last bar (ALL 2026)</td><td><code>55-60 : 1403</code> (really ≥55)</td><td><code>55+ : 1403</code> — labelled as the catch-all it is</td></tr>
+      <tr><td>F2 · footer total / UNKNOWN</td><td><code>450,433</code> · 15.1% (junk kept)</td><td><code>427,500</code> · 11.4% — matches the rule &amp; every chart</td></tr>
+      <tr><td>F3 · forecast tail (ALL)</td><td>last <i>actual</i> = "Jun 26" = 4,320 (partial, unmarked)</td><td>last <i>actual</i> = "May 26"; partial "Jun 26 = 4,316" shown separately as a hollow point</td></tr>
+      <tr><td>F4 · no-baseline (Vehicle Fire 2011)</td><td>"…(no baseline). <b>Handling time is down.</b>" + "Nothing unusual — tracks the norm."</td><td>"…(no comparable baseline). <b>Handling time can't be compared — this period has no 5-year baseline.</b>"</td></tr>
+      <tr><td>F4 · zero-match (Unicorn Attack 2026)</td><td>same false "nothing unusual" reassurance</td><td>"No incidents match this selection — nothing to compare to a norm."</td></tr>
+      <tr><td>F5 · "Which station is slowest?"</td><td><code>refused = None</code>, answered with a KPI</td><td><b>refused = True, logged</b> ("gas station downtown" is <i>not</i> refused)</td></tr>
+      <tr><td>F7 · forbidden ask via <code>{"question"}</code></td><td>generic fallback, unlogged</td><td><b>refused = True, logged</b> — gate closed on both keys</td></tr>
+      <tr class="same"><td>Geo spot-check (Downtown MVI 2026)</td><td>count 54 / median 19.5 / expected 47</td><td>Unchanged: 54 / 19.5 / 47 — data integrity preserved</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Pitch feedback that mattered</h3>
+  <p><b>P1</b> (lead with the user) drove the story-first ordering of the spec. <b>P3</b> (chatbot guardrails + live feed) turned out to be half-done already — the live refresh — and half-covered by the F5/F7 fix.</p>
+
+  <h3>Use-week episode that taught us something</h3>
+  <p>The refusal log (<code>logs/refusal_log.csv</code>) is almost entirely <i>"what was the average response time?"</i> — over a dozen times across the week. The thing users most want is the one thing the data honestly cannot give, and the app is right to refuse it every time. That's not a bug in demand; it's the reason the refusal is a headline feature, and why the guide page states the dispatch→close limitation up front.</p>
+
+  <!-- ================= 3 ================= -->
+  <h2><span class="n">3</span>What we changed</h2>
+  <p>Fixes F1–F5 &amp; F7 landed in <code>app/server.py</code> (plus the forecast render in <code>app/static/index2.html</code>). The cleaning fix (F2) went into <code>_derive()</code>, so it takes effect on cache-load and after every live refresh — no need to rebuild the 315 MB CSV. The <b>F5</b> fix hardened the chatbot's refusal gate so station-performance asks are declined and logged like the response-time asks already were, and closed the <code>{"question"}</code> key that had bypassed it (<b>F7</b>).</p>
+
+  <!-- ================= 4 ================= -->
+  <h2><span class="n">4</span>The revised spec</h2>
+  <p><code>AGENTS.md</code> is updated so the next reader sees the app as it now is:</p>
+  <ul>
+    <li>The <b>three user stories are at the top</b> (§0), Story #1 first — benefit before build (answers pitch note P1).</li>
+    <li>§2 "What Good Looks Like" now names the <code>55+</code> catch-all, the junk-excluded totals, the no-baseline honesty rule, and the partial-month forecast rule.</li>
+    <li>The build spec's cleaning, metrics, forecast, and chatbot sections describe the fixed behaviour.</li>
+    <li>A new <b>"Gaps left open on purpose"</b> section lists F6, F8, F9, F10, and the deck rewrite, each with its reason.</li>
+    <li>The "Verify before shipping" checklist now includes the station refusal, the <code>{"question"}</code> key, the <code>55+</code> label, the 427,500 total, the no-baseline reading, and the partial-forecast split — so a fresh session can confirm all of it by behaviour.</li>
+  </ul>
+
+  <h3 class="gap">Gaps left open on purpose</h3>
+  <ul class="gap">
+    <li><b>F6 — prescriptive text in payloads.</b> Unused recommendation strings + a dead renderer. Nothing shows them on screen; cleanup parked.</li>
+    <li><b>F8 — hotspot count 109 vs 111.</b> Rounding drift at the 25% edge; both directionally right. One shared definition deferred.</li>
+    <li><b>F9 — UNKNOWN as a placed map point.</b> Only appears if the lead opts in; default excludes it and states the policy.</li>
+    <li><b>F10 — odd query params.</b> Self-labelled and survivable; no one drives these in a real review.</li>
+    <li><b>The 5-minute deck.</b> Still over-weights build/governance and reads text-heavy. App-side answer done (stories on top); the deck rewrite is a separate deliverable.</li>
+  </ul>
+
+  <!-- ================= 5 ================= -->
+  <h2><span class="n">5</span>A record of judgment</h2>
+  <div class="judgment">
+    We treated each finding as a claim, not a verdict, and let Story&nbsp;#1 settle every call: if Dana would say the number out loud in a review, we fixed it; if the user never sees it, we parked it and said so. That put the Blocker (F1) and the three Majors (F2–F4) on the fix list because each is exactly the kind of figure that gets repeated in a room and then falls over — a bar that hides the tail, a total that won't reconcile, a month that reads as a collapse, a reassurance with no baseline behind it. F5 we fixed so the refusal that is meant to be a feature actually fires for station-performance asks, not just response-time ones — a guardrail that only counts if it triggers on the questions people really type. The five minor findings we deferred on purpose, because loosening an unseen contract or a one-neighbourhood rounding gap doesn't change where a chief sends an officer on Wednesday. The clearest lesson came free from the use-week log: the thing people ask for most is the thing this data honestly can't give, and the app's job is to keep refusing it — clearly, and on the record. <b>What's left open is small, visible, and named; what's fixed is the part a lead has to defend.</b>
+  </div>
+
+  <footer><span>the project team</span><span>Deployment Assessment · post-deployment review, 2026-07-03</span></footer>
+</div>
+</body>
+</html>
