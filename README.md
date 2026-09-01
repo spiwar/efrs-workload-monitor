@@ -1,10 +1,8 @@
 # EFRS Incident Duration & Workload Monitor
 
-An honesty-first public-data dashboard: it turns ~946K raw City of Edmonton fire
-dispatch records (2011 → present) into incident **volume** and **handling-time** monitoring
-read against 5-year historical baselines, for fire-rescue operations leadership.
+A public-data dashboard for fire-rescue operations leadership. It turns ~946K raw City of Edmonton fire dispatch records (2011 → present) into incident volume and handling-time monitoring.
 
-- **Run it in one command:** `pip install -r requirements.txt && python app/server.py` (details below; optional self-hosting in [DEPLOY.md](DEPLOY.md))
+- **Run it in one command:** `pip install -r requirements.txt && python app/server.py`
 - **Final report:** [`report/FINAL_REPORT.md`](report/FINAL_REPORT.md)
 - **Evaluation:** known-answer test suite, 6/12 baseline → 12/12 after fixes — see [`evaluation/`](evaluation/)
 
@@ -16,12 +14,11 @@ read against 5-year historical baselines, for fire-rescue operations leadership.
 
 ## Why it looks like this
 
-Every design decision serves one bar: *a number the operations lead can say out loud in a
-review and defend*. The dataset has no arrival or call-received timestamp, so the app
-**refuses** to show "response time" — duration is always labelled **event handling time
-(dispatch→close)**. Refusals are a feature: the chatbot declines unsupported asks (response
-times, station rankings) and logs them; overrides are logged; every metric carries its N and
-a like-for-like 5-year baseline for the same calendar window.
+- Every design decision serves one bar: *a number the operations lead can say out loud in a
+review and defend*.
+- The dataset has no arrival or call-received timestamp, so the app will not show "response time" and uses "event handling time" (dispatch→close) instead.
+- Refusals are a feature: the chatbot declines unsupported asks (response
+times, station rankings) and logs them
 
 ## Architecture
 
